@@ -1,20 +1,15 @@
 package com.wut;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
-import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 import java.util.Stack;
 
 /**
@@ -26,54 +21,81 @@ public class JsonParser {
     private Stack<String> visited = new Stack<String>();
 
 
-    public void visitUsersContacts(String userUrl) {
-        Elements linkContactList = getUrlContacts(userUrl);
-        for (Element linkContact : linkContactList) {
-            String linkToContact = linkContact.attr("href") + "kontakty";
-            toVisitNeighbours.add(linkToContact);
-            visited.add(linkToContact);
-            System.out.println(linkToContact);
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            saveToFile(userUrl + " , "  +linkToContact);
+    public void visitFriendsOnePage(Elements friendContactList, String userUrl) {
+//        Elements friendContactList = getUrlContactsFromOnePage(userUrl + pageContactNumber);
+
+        for (Element friendRow : friendContactList) {
+            String hrefToFriend = friendRow.attr("href");
+//            for (String linkvisited : visited) {
+//                if (!linkvisited.contains(hrefToFriend)) {
+                    toVisitNeighbours.add(hrefToFriend);
+                    visited.add(hrefToFriend);
+//                }
+                System.out.println("friend " + hrefToFriend);
+
+                saveToFile(userUrl + " , " + hrefToFriend);
+//            }
 
         }
     }
 
-    private Elements getUrlContacts(String userUrl) {
-        Elements linkContactList = null;
+    public void visitFriendsInAllPages(String userUrl) {
         try {
-            Document doc = Jsoup.connect(userUrl).get();
-            Elements contactList = doc.select("table.contactList");
-            Elements photosList = contactList.select("td.inside.photo");
-            linkContactList = photosList.select("a[href]");
-        } catch (IOException je) {
-            je.printStackTrace();
+            Document doc = Jsoup.connect(userUrl+"kontakty/s/1").get();
+            Elements pagerElement = doc.select("ul:not(#contactLetters).pager").select("li");
+            int numberOfPages = 0;
+            if (pagerElement.size() > 1) {
+                Element lastPage = pagerElement.get(pagerElement.size() - 2);
+                numberOfPages =  Integer.parseInt(lastPage.select("a").html());
+            }
+            Elements friendHrefList = getUrlContactsFromOnePage(doc);
+            visitFriendsOnePage(friendHrefList, userUrl);
+            for(int i = 0; i < numberOfPages;i++) {
+                try {
+                    Thread.sleep(10*1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                doc = Jsoup.connect(userUrl + "kontakty/s/"+i).get();
+                friendHrefList = getUrlContactsFromOnePage(doc);
+                visitFriendsOnePage(friendHrefList, userUrl);
+
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        return linkContactList;
+
     }
+
+    private Elements getUrlContactsFromOnePage(Document doc) {
+        Elements friendHrefList = null;
+
+        Elements friendList = doc.select("table.contactList");
+        Elements photosList = friendList.select("td.inside.photo");
+        friendHrefList = photosList.select("a[href]");
+
+        return friendHrefList;
+    }
+
 
     //przeszukiwanie grafu wszerz
     public void searchGraph(String startUrl) {
 //        toVisitNeighbours.add(startUrl);
         visited.add(startUrl);
-        visitUsersContacts(startUrl);
+        visitFriendsInAllPages(startUrl);
         while (!toVisitNeighbours.isEmpty()) {
             String nextVisit = toVisitNeighbours.remove(0);
             System.out.println(nextVisit);
-            visitUsersContacts(nextVisit);
-            System.out.println(visited.size());
+            visitFriendsInAllPages(nextVisit);
         }
 
     }
-    private void saveToFile(String line){
+
+    private void saveToFile(String line) {
         System.out.println(line);
         PrintWriter output = null;
         try {
-            output = new PrintWriter(new FileWriter("out.txt",true));
+            output = new PrintWriter(new FileWriter("out.txt", true));
             output.println(line);
             output.close();
         } catch (IOException e) {
