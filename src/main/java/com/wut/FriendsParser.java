@@ -11,7 +11,7 @@ import java.util.*;
 /**
  * Created by rafal on 12/14/16.
  */
-public class JsonParser {
+public class FriendsParser {
     private Stack<String> toDo = new Stack<String>();
     private Set<String> done = new HashSet<String>();
 
@@ -24,11 +24,11 @@ public class JsonParser {
         for (Element friendRow : friendContactList) {
             String hrefToFriend = friendRow.attr("href");
             done.add(userUrl);
+            //sprawdzenie czy nie jest w zrobionych
             for (String linkvisited : done) {
                 if (!linkvisited.contains(hrefToFriend)) {
                     toDo.add(hrefToFriend);
                 }
-
             }
 
             saveToFile(userUrl + " , " + hrefToFriend);
@@ -38,7 +38,7 @@ public class JsonParser {
         if (nrAddedRows > 800 && lastPage) {
             try {
                 Thread.sleep(3* 60 * 1000);
-                System.out.println("I'm sleeping for 3 minuts");
+                System.out.println("I'm sleeping for 3 minutes");
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -47,29 +47,23 @@ public class JsonParser {
 
     public void visitFriendsInAllPages(String userUrl) {
         try {
-            Document doc = Jsoup.connect(userUrl + "kontakty/s/1").get();
+            Document doc = Jsoup.connect(userUrl + "kontakty/").timeout(14000).get();
             Elements pagerElement = doc.select("ul:not(#contactLetters).pager").select("li");
-            int numberOfPages = 0;
-            if (pagerElement.size() > 1) {
-                Element lastPage = pagerElement.get(pagerElement.size() - 2);
-                numberOfPages = Integer.parseInt(lastPage.select("a").html());
-            }
+            int numberOfPages = getNrOfPageFriends(pagerElement);
+
             Elements friendHrefList = getUrlContactsFromOnePage(doc);
             visitFriendsOnePage(friendHrefList, userUrl);
             lastPage = false;
 
             for (int i = 2; i <= numberOfPages; i++) {
                 try {
-                    Thread.sleep(5 * 1000);
+                    Thread.sleep(14 * 1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
                 doc = Jsoup.connect(userUrl + "kontakty/s/" + i).get();
                 friendHrefList = getUrlContactsFromOnePage(doc);
                 visitFriendsOnePage(friendHrefList, userUrl);
-                if (i == numberOfPages) {
-                    lastPage = true;
-                }
             }
 
         } catch (IOException e) {
@@ -77,6 +71,14 @@ public class JsonParser {
         }
 //        }
 
+    }
+    private int getNrOfPageFriends(Elements pagerElement) {
+        int numberOfPages = 0;
+        if (pagerElement.size() > 1) {
+            Element lastPage = pagerElement.get(pagerElement.size() - 2);
+            numberOfPages = Integer.parseInt(lastPage.select("a").html());
+        }
+        return numberOfPages;
     }
 
     private Elements getUrlContactsFromOnePage(Document doc) {
@@ -92,7 +94,7 @@ public class JsonParser {
 
     //przeszukiwanie grafu wszerz
     public void searchGraph(String startUrl) {
-//        toDo.add(startUrl);
+//        toDo.add(0,startUrl);
 //        done.add(startUrl);
 //        visitFriendsInAllPages(startUrl);
         while (!toDo.isEmpty()) {
@@ -109,7 +111,7 @@ public class JsonParser {
         FileReader fr = null;
 
         try {
-            br = new BufferedReader(new FileReader("out.txt"));
+            br = new BufferedReader(new FileReader("out2.txt"));
             String currentLine;
             while ((currentLine = br.readLine()) != null) {
                 String visited = currentLine.split(",")[0].trim();
@@ -118,7 +120,6 @@ public class JsonParser {
                 boolean addToDo = true;
                 this.toDo.add(toVisit);
             }
-
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -147,17 +148,16 @@ public class JsonParser {
     }
 
 
+
     private void saveToFile(String line) {
         System.out.println(line);
         PrintWriter output = null;
         try {
-            output = new PrintWriter(new FileWriter("out.txt", true));
+            output = new PrintWriter(new FileWriter("out2.txt", true));
             output.println(line);
             output.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-
     }
 }
